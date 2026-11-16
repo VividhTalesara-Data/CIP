@@ -46,7 +46,8 @@ export const demoPlanner: Planner = {
     const hasProduct = productConcepts.some(item => item.pattern.test(question))
     const hasNewMetric = metrics.some(item => item.terms.test(question))
     const inherit = Boolean(followUp && !hasProduct && (!hasNewMetric || /device|channel|source|evidence|alternative|release|customer signals|support signal|affected|limitation|segment|these accounts/i.test(question)))
-    const analysisText = inherit && previous ? `${previous.question}. ${question}` : question
+    const contextQuestion = inherit && previous ? previous.contextQuestion ?? previous.question : question
+    const analysisText = inherit ? `${contextQuestion}. ${question}` : question
     let matched = metrics.filter(item => item.terms.test(analysisText))
     if (matched.some(item => item.metric === 'conversion')) matched = matched.filter(item => item.metric !== 'openings')
     if (matched.some(item => item.metric === 'campaign')) matched = [...matched.filter(item => item.metric === 'campaign'), ...matched.filter(item => item.metric !== 'campaign')]
@@ -56,7 +57,10 @@ export const demoPlanner: Planner = {
     const diagnostic = /why|driv|declin|lower|what.*going on|what.*behind|affect|friction/i.test(analysisText)
     const capabilities = new Set<Capability>(matched.flatMap(item => item.capabilities))
     if (/market|volatility|trading/i.test(analysisText)) {
-      capabilities.add('market'); capabilities.add('trading'); capabilities.add('customers')
+      capabilities.add('market')
+      if (!inherit || previous?.scenario === 'volatility') {
+        capabilities.add('trading'); capabilities.add('customers')
+      }
     }
     if (channels.includes('Mobile')) capabilities.add('mobile')
     if (channels.includes('Live chat')) capabilities.add('chat')
@@ -98,7 +102,7 @@ export const demoPlanner: Planner = {
     }
     const scope = products.length ? products.join(' / ') : profile === 'retirement' ? 'Retirement' : primary === 'engagement' ? 'Brokerage customer cohorts' : 'Selected business context'
     return {
-      question, context, scenario, sources: selectSources(capabilities), scope,
+      question, contextQuestion, context, scenario, sources: selectSources(capabilities), scope,
       period: scenario === 'unsupported' ? 'Requested period requires validation' : period,
       comparison: scenario === 'unsupported' ? 'Comparison to be confirmed' : comparison,
       assumptions: [

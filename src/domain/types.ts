@@ -3,10 +3,39 @@ export type Intent = 'descriptive' | 'comparative' | 'diagnostic' | 'exploratory
 export type Metric = 'openings' | 'conversion' | 'retention' | 'engagement' | 'support' | 'campaign' | 'social' | 'performance' | 'transfers' | 'appointments' | 'unknown'
 export type Scenario = 'conversion' | 'roth' | 'hsa' | 'volatility' | 'retention' | 'rollovers' | 'unsupported'
 export type Capability = 'accounts' | 'journeys' | 'mobile' | 'releases' | 'incidents' | 'calls' | 'assistant' | 'chat' | 'search' | 'campaigns' | 'policies' | 'market' | 'trading' | 'customers' | 'retention' | 'money' | 'retirement' | 'appointments' | 'social' | 'social-live'
-export type SourceId = Capability
-export type NodeStatus = 'planned' | 'retrieving' | 'analyzing' | 'complete' | 'empty' | 'error' | 'cancelled'
-export type RunStatus = 'running' | 'complete' | 'partial' | 'cancelled'
+export type CustomSourceId = `custom:${string}`
+export type McpSourceId = `mcp:${string}`
+export type SourceId = Capability | CustomSourceId | McpSourceId
+export type NodeStatus = 'planned' | 'retrieving' | 'analyzing' | 'complete' | 'empty' | 'error' | 'cancelled' | 'unconfigured'
+export type RunStatus = 'running' | 'complete' | 'partial' | 'cancelled' | 'denied'
 export type Stage = 'discover' | 'investigate' | 'reconcile' | 'answer'
+
+export type FieldType = 'string' | 'number' | 'date' | 'boolean'
+export type FieldRole = 'identifier' | 'dimension' | 'measure' | 'time'
+export type Aggregation = 'none' | 'sum' | 'avg' | 'min' | 'max' | 'count' | 'count_distinct'
+export interface SemanticField {
+  name: string
+  description: string
+  dataType: FieldType
+  role: FieldRole
+  aggregation: Aggregation
+  unit: string
+}
+export interface SemanticMetric {
+  intent: Metric
+  name: string
+  field: string
+  definition: string
+  filters: string
+}
+export interface SemanticContext {
+  grain: string
+  timezone: string
+  businessDefinitions: string
+  caveats: string
+  fields: SemanticField[]
+  metrics: SemanticMetric[]
+}
 
 export interface SourceDefinition {
   id: SourceId
@@ -20,8 +49,13 @@ export interface SourceDefinition {
   timeField: string
   freshness: string
   access: string
-  handler: 'demo'
+  handler: 'demo' | 'unconfigured'
   connectionKey: string
+  allowedUserIds?: string[]
+  providerId?: string
+  connectionKind?: 'data' | 'mcp'
+  semanticContext?: SemanticContext
+  connectionProperties?: Record<string, string>
 }
 
 export interface QuestionContext {
@@ -36,6 +70,7 @@ export interface QuestionContext {
 
 export interface Plan {
   question: string
+  contextQuestion?: string
   context: QuestionContext
   scenario: Scenario
   sources: SourceId[]
@@ -45,6 +80,13 @@ export interface Plan {
   assumptions: string[]
   limitation?: string
   clarification?: string
+}
+
+export interface EvidenceContext {
+  category: 'engagement' | 'market' | 'business'
+  title: string
+  summary: string
+  excerpt?: { label: string; text: string }
 }
 
 export interface Evidence {
@@ -63,6 +105,7 @@ export interface Evidence {
   caveat: string
   retrievedAt: string
   synthetic: true
+  context?: EvidenceContext
 }
 
 export interface WorkflowNode {
@@ -88,25 +131,46 @@ export interface WorkflowEvent {
   message: string
 }
 
+export interface Confidence {
+  score: number | null
+  explanation: string
+}
+
 export interface Answer {
   headline: string
   summary: string
-  metrics: { label: string; value: string; detail: string; evidenceId: string }[]
-  findings: { text: string; evidenceIds: string[]; strength: 'Observed' | 'Association' | 'Limitation' }[]
-  chart?: { title: string; unit: string; rows: Evidence['rows']; evidenceId: string }
+  confidence: Confidence
+  metrics: { label: string; value: string; detail: string; evidenceId: string; confidence: Confidence }[]
+  findings: { text: string; evidenceIds: string[]; strength: 'Observed' | 'Association' | 'Limitation'; confidence: Confidence }[]
+  highlights: (EvidenceContext & { observation: string; caveat: string; sourceId: SourceId; evidenceId: string; confidence: Confidence })[]
+  chart?: { title: string; unit: string; rows: Evidence['rows']; evidenceId: string; confidence: Confidence }
   recommendations: string[]
   limitations: string[]
   followUps: string[]
 }
 
-export interface Investigation {
+export interface AccessSummary {
+  principalId: string
+  status: 'allowed' | 'partial' | 'denied'
+  excludedSourceCount: number
+  excludedSourceIds: SourceId[]
+  message: string
+}
+
+export interface InvestigationTurn {
   id: string
+  turn: number
+  access: AccessSummary
   plan: Plan
   nodes: WorkflowNode[]
   evidence: Evidence[]
   events: WorkflowEvent[]
   status: RunStatus
   answer?: Answer
+}
+
+export interface Investigation extends InvestigationTurn {
+  turns: InvestigationTurn[]
 }
 
 export interface ConnectorRequest {

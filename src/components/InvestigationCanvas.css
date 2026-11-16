@@ -1,5 +1,9 @@
 .workspace-main { padding-inline: 3%; }
 .workspace { max-width: 1440px; }
+.canvas-continuation { padding: 14px 22px; background: #172b24; border-bottom: 1px solid #365548; color: #d5e8db; display: grid; gap: 6px; font-size: 12px; line-height: 1.6; }
+.canvas-continuation span { font-size: 11px; color: #b6cec0; }
+.source-flight[data-focused="true"] .floating-source { outline: 2px solid #b3e1b4; outline-offset: 4px; }
+.connection-group.focused .connection-current { stroke-width: 3; opacity: 1; }
 .workspace-breadcrumb, .investigation-question, .scope-row { max-width: 1120px; margin-inline: auto; }
 .investigation-question { max-width: 1120px; }
 .investigation-theater {

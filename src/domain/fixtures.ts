@@ -1,7 +1,7 @@
 import { DEMO_AS_OF } from './sources.ts'
 import type { Capability, Connector, Evidence, Plan, SourceId } from './types.ts'
 
-function evidence(sourceId: SourceId, plan: Plan, title: string, finding: string, values: Record<string, number>, options: Partial<Pick<Evidence, 'rows' | 'unit' | 'signals' | 'definition' | 'grain' | 'caveat'>> = {}): Evidence {
+function evidence(sourceId: SourceId, plan: Plan, title: string, finding: string, values: Record<string, number>, options: Partial<Pick<Evidence, 'rows' | 'unit' | 'signals' | 'definition' | 'grain' | 'caveat' | 'context'>> = {}): Evidence {
   return {
     id: `${plan.scenario}:${sourceId}`, sourceId, title, finding, values,
     rows: [], unit: 'count', signals: [], definition: 'Aggregate synthetic observations; no real enterprise query executed.',
@@ -33,14 +33,29 @@ export function getFixture(sourceId: SourceId, plan: Plan): Evidence | null {
       })
       case 'incidents': return make('The same service appears in an incident', 'Synthetic incident DEMO-1042 records verification timeouts beginning October 26. The incident links the identity service to a deployment change.', { relevantIncidents: 1 }, { grain: 'Incident / affected service', caveat: 'Aggregate service and time alignment; incident records are not joined to individual customers.' })
       case 'mobile': return make('Native app completion is stable', 'Native app conversion is 65% in both periods, across 2,000 eligible starts per period.', { baselineRate: 65, currentRate: 65, starts: 2000 }, { unit: '%' })
-      case 'calls': return make('Verification-related calls increased', 'Identity-verification contact volume increased from 120 to 310 calls.', { baseline: 120, current: 310 }, { signals: [], grain: 'Distinct call interaction; repeat callers are not deduplicated as customers' })
-      case 'assistant': return make('The chatbot shows the same friction', 'Fidelity Assistant conversations about being unable to verify identity increased from 80 to 240.', { baseline: 80, current: 240 }, { grain: 'Distinct chatbot conversation', caveat: 'Conversation counts are not unique customer counts. No causal inference from cross-channel volumes.' })
-      case 'chat': return make('Live chat corroborates the verification theme', 'Verification-related live chats increased from 45 to 110.', { baseline: 45, current: 110 }, { grain: 'Distinct live-chat interaction' })
-      case 'search': return make('Help-seeking shifted toward verification', 'Search sessions containing verification-help intent increased from 200 to 520.', { baseline: 200, current: 520 }, { grain: 'Distinct search session' })
+      case 'calls': return make('Verification-related calls increased', 'Identity-verification contact volume increased from 120 to 310 calls.', { baseline: 120, current: 310 }, { signals: [], grain: 'Distinct call interaction; repeat callers are not deduplicated as customers',
+        context: { category: 'engagement', title: 'Customers describe a repeated verification step', summary: 'The scripted dialogue illustrates difficulty progressing through verification. Contact counts cannot establish which applicants abandoned the journey.',
+          excerpt: { label: 'Verification support call', text: 'Customer: I keep returning to the identity check after retrying on my phone browser.\nAgent: Let us review the verification step and the message you are seeing.' } },
+      })
+      case 'assistant': return make('The chatbot shows the same friction', 'Fidelity Assistant conversations about being unable to verify identity increased from 80 to 240.', { baseline: 80, current: 240 }, { grain: 'Distinct chatbot conversation', caveat: 'Conversation counts are not unique customer counts. No causal inference from cross-channel volumes.',
+        context: { category: 'engagement', title: 'Self-service conversations echo the verification theme', summary: 'The example concerns getting unstuck, not product eligibility. It illustrates the same topic as the call evidence without linking the two conversations to one person.',
+          excerpt: { label: 'Fidelity Assistant verification conversation', text: 'Customer: My identity check did not finish. Do I need to start my application again?\nAssistant: I can help you find the next verification step.' } },
+      })
+      case 'chat': return make('Live chat corroborates the verification theme', 'Verification-related live chats increased from 45 to 110.', { baseline: 45, current: 110 }, { grain: 'Distinct live-chat interaction',
+        context: { category: 'engagement', title: 'Live-chat requests concern completing the application', summary: 'The sample distinguishes a request for help completing verification from a confirmed account-opening outcome.',
+          excerpt: { label: 'Live-chat verification conversation', text: 'Customer: I have entered my details, but the verification page will not let me continue.\nAgent: What message appears when you select continue?' } },
+      })
+      case 'search': return make('Help-seeking shifted toward verification', 'Search sessions containing verification-help intent increased from 200 to 520.', { baseline: 200, current: 520 }, { grain: 'Distinct search session',
+        context: { category: 'engagement', title: 'Search activity adds a help-seeking signal', summary: 'Verification-help intent is consistent with the support theme. Search sessions are not unique people, and the fixture does not show whether searching resolved the problem.' },
+      })
       case 'customers': return make('The affected population is mobile-web applicants', 'The fixture supports an aggregate channel breakdown, not age, income or individual-customer attribution.', { mobileShare: 50 }, { unit: '%', caveat: 'No person-level support-to-journey joins are available in this fixture.' })
-      case 'campaigns': return make('Acquisition mix is stable in the fixture', 'Paid campaign share is 30% in both periods. The campaign calendar records no launch in the affected period.', { baselinePaidShare: 30, currentPaidShare: 30, launches: 0 }, { unit: '%', caveat: 'A stable channel mix does not rule out unmeasured campaign or audience differences.' })
+      case 'campaigns': return make('Acquisition mix is stable in the fixture', 'Paid campaign share is 30% in both periods. The campaign calendar records no launch in the affected period.', { baselinePaidShare: 30, currentPaidShare: 30, launches: 0 }, { unit: '%', caveat: 'A stable channel mix does not rule out unmeasured campaign or audience differences.',
+        context: { category: 'business', title: 'The campaign check narrows, but does not eliminate, alternatives', summary: 'There is no observed launch or paid-share shift in this fixture to explain the timing. Audience composition and within-channel differences still need validation.' },
+      })
       case 'policies': return null
-      case 'market': return make('Market context does not isolate a cause', 'The selected historical window contains market variation, but no fixture supports attributing the channel-specific conversion decline to it.', { observations: 28 }, { caveat: 'Seasonality and broader market explanations remain untested; no current headlines were substituted.' })
+      case 'market': return make('Market context does not isolate a cause', 'The selected historical window contains market variation, but no fixture supports attributing the channel-specific conversion decline to it.', { observations: 28 }, { caveat: 'Seasonality and broader market explanations remain untested; no current headlines were substituted.',
+        context: { category: 'market', title: 'Market summary: context, not a conversion explanation', summary: 'Historical observations provide background, but there is no controlled market-to-journey comparison. A market explanation remains untested rather than ruled out. This is not a live news summary.' },
+      })
       default: return null
     }
   }
@@ -61,14 +76,25 @@ export function getFixture(sourceId: SourceId, plan: Plan): Evidence | null {
   }
   if (plan.scenario === 'volatility') {
     switch (sourceId) {
-      case 'market': return make('Volatility was higher in the selected window', 'The synthetic average volatility index increased from 18 to 27 across equal historical windows.', { baseline: 18, current: 27 }, { unit: 'index points', signals: ['calls', 'assistant'], caveat: 'Synthetic market observations, not live prices or news.' })
+      case 'market': return make('Volatility was higher in the selected window', 'The synthetic average volatility index increased from 18 to 27 across equal historical windows.', { baseline: 18, current: 27 }, { unit: 'index points', signals: ['calls', 'assistant'], caveat: 'Synthetic market observations, not live prices or news.',
+        context: { category: 'market', title: 'Market summary: a higher-volatility comparison window', summary: 'The index is a historical period average, not an intraday price or a forecast. Timing alone cannot establish that market conditions caused changes in trading or engagement.' },
+      })
       case 'trading': return make('Trading activity increased', 'Executed trades rose from 40,000 to 52,000 across an unchanged cohort of 10,000 customers.', { baseline: 40000, current: 52000, customers: 10000 }, {
         grain: 'Executed trade / fixed customer cohort', rows: [{ label: 'Equities', baseline: 24000, current: 32000 }, { label: 'ETFs', baseline: 12000, current: 16000 }, { label: 'Other', baseline: 4000, current: 4000 }],
+        context: { category: 'business', title: 'Trading activity is measured within a fixed cohort', summary: 'The trade count measures activity, not investment performance, customer gains or recommendation quality. Instrument-level comparisons are available in the chart and evidence table.' },
       })
-      case 'journeys': return make('Digital activity rose alongside trading', 'Engaged web sessions increased from 20,000 to 26,000. Sessions are not unique customers.', { baseline: 20000, current: 26000 }, { grain: 'Distinct engaged web session' })
+      case 'journeys': return make('Digital activity rose alongside trading', 'Engaged web sessions increased from 20,000 to 26,000. Sessions are not unique customers.', { baseline: 20000, current: 26000 }, { grain: 'Distinct engaged web session',
+        context: { category: 'engagement', title: 'More digital activity does not establish deeper relationships', summary: 'Repeat visits can increase session counts without adding customers. The fixture does not measure satisfaction, session-to-trade conversion or long-term engagement.' },
+      })
       case 'customers': return make('The cohort is held constant', 'The comparison uses the same 10,000 brokerage customers in each window.', { baseline: 10000, current: 10000 }, { grain: 'Distinct customer in both windows' })
-      case 'calls': return make('Trading-related calls also increased', 'Trading-related calls increased from 500 to 700.', { baseline: 500, current: 700 }, { grain: 'Distinct call' })
-      case 'assistant': return make('More chatbot conversations concern trading', 'Fidelity Assistant trading conversations rose from 800 to 1,120.', { baseline: 800, current: 1120 }, { grain: 'Distinct conversation' })
+      case 'calls': return make('Trading-related calls also increased', 'Trading-related calls increased from 500 to 700.', { baseline: 500, current: 700 }, { grain: 'Distinct call',
+        context: { category: 'engagement', title: 'Trading support includes requests for clarification', summary: 'This scripted example illustrates an order-status question. The aggregate fixture does not quantify this subtopic or establish that volatility triggered the call.',
+          excerpt: { label: 'Trading support call', text: 'Customer: Can you help me understand the status of my order while prices are moving?\nAgent: Let us review the order status and the information shown on your screen.' } },
+      })
+      case 'assistant': return make('More chatbot conversations concern trading', 'Fidelity Assistant trading conversations rose from 800 to 1,120.', { baseline: 800, current: 1120 }, { grain: 'Distinct conversation',
+        context: { category: 'engagement', title: 'Trading conversations can include educational questions', summary: 'The sample illustrates a request to understand order types, not a recommendation to trade. Its frequency and any resulting trade are not measured.',
+          excerpt: { label: 'Fidelity Assistant trading conversation', text: 'Customer: Where can I learn the difference between a market order and a limit order?\nAssistant: I can point you to an explanation of order types.' } },
+      })
       default: return null
     }
   }
@@ -80,18 +106,33 @@ export function getFixture(sourceId: SourceId, plan: Plan): Evidence | null {
         rows: [{ label: 'Established', baseline: 99.4, current: 99.2 }, { label: 'New relationship', baseline: 98.6, current: 97.6 }],
       })
       case 'customers': return make('New relationships have lower retention', 'Each cohort contains 5,000 established and 5,000 new-relationship customers. Established exits: 30 to 40; new-relationship exits: 70 to 120.', { establishedBaselineExits: 30, establishedCurrentExits: 40, newBaselineExits: 70, newCurrentExits: 120 }, { caveat: 'Cohorts are independent snapshots; the fixture does not establish a causal driver.' })
-      case 'calls': return make('Service friction is a candidate explanation', 'Transfer-delay calls increased from 40 to 90; person-level linkage to exits is unavailable.', { baseline: 40, current: 90 })
-      case 'money': return make('Outbound transfers increased', 'Outbound transfers increased from 150 to 210. A transfer is not necessarily customer attrition.', { baseline: 150, current: 210 })
+      case 'calls': return make('Service friction is a candidate explanation', 'Transfer-delay calls increased from 40 to 90; person-level linkage to exits is unavailable.', { baseline: 40, current: 90 }, {
+        context: { category: 'engagement', title: 'Transfer uncertainty is a service-review lead', summary: 'The example illustrates a request for a progress update. It cannot identify an exiting customer or prove that a delay caused an exit.',
+          excerpt: { label: 'Transfer-delay support call', text: 'Customer: I cannot tell whether my transfer is still processing. Can someone check the status?\nAgent: Let us review the transfer progress and any outstanding steps.' } },
+      })
+      case 'money': return make('Outbound transfers increased', 'Outbound transfers increased from 150 to 210. A transfer is not necessarily customer attrition.', { baseline: 150, current: 210 }, {
+        context: { category: 'business', title: 'Movement counts and customer exits answer different questions', summary: 'A customer may transfer assets while keeping a retirement relationship open. Validate customer-level linkage before treating transfer growth as the explanation for retention changes.' },
+      })
       default: return null
     }
   }
   if (plan.scenario === 'rollovers') {
     switch (sourceId) {
-      case 'calls': return make('Rollover calls increased by 50%', 'Rollover-related calls rose from 400 to 600.', { baseline: 400, current: 600 }, { grain: 'Distinct call', signals: ['policies', 'search'], rows: [{ label: 'Status', baseline: 200, current: 360 }, { label: 'Eligibility', baseline: 120, current: 140 }, { label: 'Other', baseline: 80, current: 100 }] })
-      case 'assistant': return make('Status questions are rising in the chatbot', 'Fidelity Assistant rollover-status conversations increased from 300 to 510.', { baseline: 300, current: 510 }, { grain: 'Distinct conversation' })
+      case 'calls': return make('Rollover calls increased by 50%', 'Rollover-related calls rose from 400 to 600.', { baseline: 400, current: 600 }, { grain: 'Distinct call', signals: ['policies', 'search'], rows: [{ label: 'Status', baseline: 200, current: 360 }, { label: 'Eligibility', baseline: 120, current: 140 }, { label: 'Other', baseline: 80, current: 100 }],
+        context: { category: 'engagement', title: 'The conversation is about progress, not just eligibility', summary: 'The scripted call illustrates the status-seeking theme. The contact mix can be reviewed separately from total rollover-request volume.',
+          excerpt: { label: 'Rollover-status support call', text: 'Customer: I started a rollover and need a progress update. Is there anything left for me to do?\nAgent: Let us check the rollover status and the next steps.' } },
+      })
+      case 'assistant': return make('Status questions are rising in the chatbot', 'Fidelity Assistant rollover-status conversations increased from 300 to 510.', { baseline: 300, current: 510 }, { grain: 'Distinct conversation',
+        context: { category: 'engagement', title: 'Self-service also shows a need for status visibility', summary: 'This example illustrates the chatbot theme without assuming the same people also called. Channel volumes must not be combined as distinct customers.',
+          excerpt: { label: 'Fidelity Assistant rollover conversation', text: 'Customer: Where can I see the progress of my rollover?\nAssistant: I can help you locate rollover status information.' } },
+      })
       case 'retirement': return make('Rollover volume increased more slowly', 'Rollover requests increased from 1,000 to 1,100; this does not explain the entire contact-volume increase.', { baseline: 1000, current: 1100 }, { grain: 'Distinct rollover request' })
-      case 'policies': return make('A processing-message change is a hypothesis', 'A synthetic October 26 announcement changed processing-time wording; the fixture contains no experiment testing its effect.', { changes: 1 }, { caveat: 'A dated announcement and rising contacts are associated, not proof of causation.' })
-      case 'search': return make('Search reinforces the status theme', 'Rollover-status search sessions rose from 250 to 410.', { baseline: 250, current: 410 }, { grain: 'Distinct search session' })
+      case 'policies': return make('A processing-message change is a hypothesis', 'A synthetic October 26 announcement changed processing-time wording; the fixture contains no experiment testing its effect.', { changes: 1 }, { caveat: 'A dated announcement and rising contacts are associated, not proof of causation.',
+        context: { category: 'business', title: 'A messaging change is worth validating', summary: 'Compare what customers were shown with the processing journey before recommending revised guidance. The announcement does not establish that the wording caused additional contacts.' },
+      })
+      case 'search': return make('Search reinforces the status theme', 'Rollover-status search sessions rose from 250 to 410.', { baseline: 250, current: 410 }, { grain: 'Distinct search session',
+        context: { category: 'engagement', title: 'Search adds a separate status-seeking signal', summary: 'Search activity supports reviewing status visibility, but there is no session-to-call linkage or evidence that a search resolved the question.' },
+      })
       default: return null
     }
   }
@@ -116,6 +157,7 @@ export function createDemoConnector(options: DemoOptions): Connector {
   return {
     async retrieve({ source, plan, signal, onActivity }) {
       signal.throwIfAborted()
+      if (source.handler !== 'demo') throw new Error('This registered source has no implemented connector. No retrieval was executed.')
       onActivity?.('retrieving', 'Connecting simulated tool')
       if (options.latency) await waitForConnector(600 + source.id.length * 25, signal)
       signal.throwIfAborted()

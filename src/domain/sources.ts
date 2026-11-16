@@ -2,7 +2,7 @@ import type { Capability, SourceDefinition, SourceId } from './types.ts'
 
 export const DEMO_AS_OF = '2026-11-12T23:59:59Z'
 
-function source(id: SourceId, name: string, platform: string, description: string, collections: string[], joinKeys: string[], timeField: string, domains: string[], capabilities: Capability[] = [id]): SourceDefinition {
+function source(id: Capability, name: string, platform: string, description: string, collections: string[], joinKeys: string[], timeField: string, domains: string[], capabilities: Capability[] = [id]): SourceDefinition {
   return {
     id, name, platform, description, collections, joinKeys, timeField, domains, capabilities,
     freshness: DEMO_AS_OF, access: 'Server-enforced business-unit scope; read-only; aggregate results',
@@ -33,6 +33,8 @@ export const sources: Record<SourceId, SourceDefinition> = {
   social: source('social', 'Social engagement', 'Snowflake', 'Review curated social interactions and deduplicated historical mentions.', ['SOCIAL_INTERACTIONS', 'SOCIAL_MENTIONS'], ['platform_post_id', 'platform'], 'published_at', ['social']),
   'social-live': source('social-live', 'Social listening', 'Sprinklr', 'Retrieve recent public themes; deduplicate by platform and post ID.', ['social_listening_mentions'], ['platform_post_id', 'platform'], 'published_at', ['social']),
 }
+
+export const sourceCapabilities: Capability[] = [...new Set(Object.values(sources).flatMap(item => item.capabilities))]
 
 export function selectSources(capabilities: Iterable<Capability>): SourceId[] {
   const required = new Set(capabilities)

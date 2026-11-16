@@ -1,46 +1,48 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { ArrowDown, ArrowRight, ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown, CircleHelp, Database, Expand, FileText, GitBranch, Globe2, List, LoaderCircle, Maximize2, MessageCircle, Minus, Network, Pause, Play, Plus, Radar, RotateCcw, ShieldCheck, Snowflake, Sparkles, Square, TriangleAlert, Workflow } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown, CircleHelp, Database, Expand, FileText, GitBranch, Globe2, List, LoaderCircle, Maximize2, MessageCircle, Minus, Network, Pause, Play, Plus, Radar, RotateCcw, ShieldCheck, Snowflake, Sparkles, Square, TriangleAlert, Workflow, Wrench } from 'lucide-react'
 import { sources } from '../domain/sources.ts'
 import { connectionPath, layoutInvestigation, SOURCE_HEIGHT, SOURCE_WIDTH, sourcePort } from '../domain/canvas-layout.ts'
 import type { Point } from '../domain/canvas-layout.ts'
 import type { Investigation, SourceDefinition, WorkflowNode } from '../domain/types.ts'
 import './InvestigationCanvas.css'
 
-const icons = { Snowflake, Splunk: AudioLines, ServiceNow: Workflow, Confluence: BookOpen, 'Newsline / My GPS': FileText, 'Market & news': Globe2, Sprinklr: MessageCircle }
+const icons = { Snowflake, Splunk: AudioLines, ServiceNow: Workflow, Confluence: BookOpen, 'Newsline / My GPS': FileText, 'Market & news': Globe2, Sprinklr: MessageCircle, MCP: Wrench }
 const colors: Record<string, string> = {
   Snowflake: '#7ac9f5', Splunk: '#f4b77d', ServiceNow: '#9edaaf', Confluence: '#acafff',
   'Newsline / My GPS': '#dfb7f4', 'Market & news': '#f3d48a', Sprinklr: '#f3a5bb',
 }
 const statusLabels: Record<WorkflowNode['status'], string> = {
   planned: 'Planned', retrieving: 'Retrieving', analyzing: 'Analyzing',
-  complete: 'Complete', empty: 'No demo evidence', error: 'Unavailable', cancelled: 'Cancelled',
+  complete: 'Complete', empty: 'No demo evidence', error: 'Unavailable', cancelled: 'Cancelled', unconfigured: 'Not connected',
 }
 
 type FlightStyle = CSSProperties & { '--source-color'?: string; '--float-delay'?: string; '--flight-delay'?: string }
+const sourceColor = (platform: string) => Object.hasOwn(colors, platform) ? colors[platform] : '#92debf'
 
 function ToolIcon({ source, size = 21 }: { source: SourceDefinition; size?: number }) {
-  const Icon = icons[source.platform as keyof typeof icons] ?? Database
+  const Icon = Object.hasOwn(icons, source.platform) ? icons[source.platform as keyof typeof icons] : Database
   return <Icon size={size} aria-hidden="true" />
 }
 
-function FloatingSource({ node, index, position, origin, run, onInspect, still }: {
+function FloatingSource({ node, index, position, origin, run, onInspect, still, focused }: {
   node: WorkflowNode; index: number; position: Point; origin: Point
-  run: Investigation; onInspect: (node: WorkflowNode) => void; still: boolean
+  run: Investigation; onInspect: (node: WorkflowNode) => void; still: boolean; focused: boolean
 }) {
   if (!node.sourceId) return null
   const source = sources[node.sourceId]
   const active = ['retrieving', 'analyzing'].includes(node.status)
   const evidence = run.evidence.find(item => item.id === node.evidenceId)
   const style: FlightStyle = {
-    '--source-color': colors[source.platform] ?? '#92debf',
+    '--source-color': sourceColor(source.platform),
     '--float-delay': `${-(index % 5) * 1.1}s`,
   }
   return <motion.div
     className="source-flight"
     data-source-id={node.sourceId}
     data-status={node.status}
+    data-focused={focused}
     style={style}
     initial={still ? false : { x: origin.x - SOURCE_WIDTH / 2, y: origin.y - SOURCE_HEIGHT / 2, opacity: 0, scale: 0.4 }}
     animate={{ x: position.x - SOURCE_WIDTH / 2, y: position.y - SOURCE_HEIGHT / 2, opacity: 1, scale: 1 }}
@@ -49,11 +51,11 @@ function FloatingSource({ node, index, position, origin, run, onInspect, still }
     <button className={`floating-source ${node.status}`} onClick={() => onInspect(node)} aria-label={`${node.title}: ${statusLabels[node.status]}. Inspect evidence`}>
       <span className="source-port source-port-left" aria-hidden="true" /><span className="source-port source-port-right" aria-hidden="true" />
       <span className="floating-source-header"><span className="floating-tool-icon"><ToolIcon source={source} /></span><span className="floating-source-identity"><strong>{source.platform}</strong><span>{node.title}</span></span><span className={`floating-source-status ${node.status}`}>
-        {active ? <LoaderCircle size={14} className="flight-spinner" /> : node.status === 'complete' ? <Check size={14} /> : node.status === 'error' ? <TriangleAlert size={14} /> : node.status === 'empty' ? <CircleHelp size={14} /> : <span className="flight-status-dot" />}
+        {active ? <LoaderCircle size={14} className="flight-spinner" /> : node.status === 'complete' ? <Check size={14} /> : node.status === 'error' ? <TriangleAlert size={14} /> : node.status === 'empty' || node.status === 'unconfigured' ? <CircleHelp size={14} /> : <span className="flight-status-dot" />}
       </span></span>
       <span className="floating-collection"><Database size={11} /><code>{source.collections[0]}</code>{source.collections.length > 1 && <span>+{source.collections.length - 1}</span>}</span>
       <span className="floating-purpose">{node.error ?? evidence?.title ?? node.finding ?? node.purpose}</span>
-      <span className="floating-source-footer"><span>{node.reused ? 'Evidence reused' : node.activity ?? statusLabels[node.status]}</span><span>{run.plan.scenario === 'unsupported' ? 'PROPOSED' : 'DEMO'} <ArrowUpRight size={10} /></span></span>
+      <span className="floating-source-footer"><span>{source.handler === 'unconfigured' ? 'Not connected' : node.reused ? 'Evidence reused' : node.activity ?? statusLabels[node.status]}</span><span>{run.plan.scenario === 'unsupported' ? 'PROPOSED' : 'DEMO'} <ArrowUpRight size={10} /></span></span>
       {active && <span className="source-scanner" aria-hidden="true" />}
     </button>
   </motion.div>
@@ -129,6 +131,8 @@ export default function InvestigationCanvas({ run, onInspect, onCancel, onRetry,
   const still = reduced || paused || run.status === 'cancelled'
   const active = sourceNodes.filter(node => ['retrieving', 'analyzing'].includes(node.status))
   const complete = sourceNodes.filter(node => node.status === 'complete')
+  const focusIds = new Set(run.answer?.findings.flatMap(finding => finding.evidenceIds))
+  const reused = sourceNodes.filter(node => node.reused).length
   const recent = run.events.filter(event => event.status === 'complete' && sourceNodes.some(node => node.id === event.nodeId)).at(-1)
   const statusText = !supported ? 'A proposed path through your data' : run.status === 'cancelled' ? 'Investigation paused' : running ? 'Watch your question become an insight' : run.status === 'partial' ? 'Investigation complete with gaps' : 'The investigation, connected'
 
@@ -194,19 +198,20 @@ export default function InvestigationCanvas({ run, onInspect, onCancel, onRetry,
       heading?.scrollIntoView({ behavior: still ? 'instant' : 'smooth', block: 'start' })
     })
   }
-  return <section ref={theater} className={`investigation-theater ${expanded ? 'expanded' : ''}`} role={expanded ? 'dialog' : undefined} aria-modal={expanded || undefined} aria-label="Animated investigation workspace" data-motion={still ? 'paused' : 'running'} data-run-status={run.status}>
+  return <section ref={theater} className={`investigation-theater ${expanded ? 'expanded' : ''}`} role={expanded ? 'dialog' : undefined} aria-modal={expanded || undefined} aria-label="Animated investigation workspace" data-motion={still ? 'paused' : 'running'} data-run-status={run.status} data-thread-id={run.id} data-turn={run.turn}>
     <div className="theater-heading">
       <div className="theater-heading-icon"><Network size={21} /></div>
       <div className="theater-heading-copy"><span className="theater-eyebrow">THE INVESTIGATION / IN MOTION</span><h2>{statusText}</h2><p className="theater-question">{run.plan.question}</p></div>
       <span className="theater-demo-badge"><span />{running ? 'SIMULATED LIVE ACTIVITY' : 'SIMULATED CONNECTIONS'}</span>
     </div>
+    {run.turn > 1 && <div className="canvas-continuation" role="status"><strong>Question {run.turn}: {run.plan.question}</strong><span>{reused} sources reused · {sourceNodes.length - reused} other sources in scope. Highlighted sources support this answer; prior answers remain below. Reused evidence does not trigger new connector calls.</span></div>}
     <div className="theater-toolbar">
       <div className="theater-view-switch" role="group" aria-label="Investigation view"><button aria-pressed={!listView} onClick={() => setListView(false)}><Network size={14} />Canvas</button><button aria-pressed={listView} onClick={() => setListView(true)}><List size={14} />Source list</button></div>
       <span className="theater-counts"><strong>{sourceNodes.length}</strong> sources <span /> <strong>{complete.length}</strong> evidence received {running && <><span /><strong>{active.length}</strong> active</>}</span>
       <div className="theater-controls">
         <button onClick={() => setPaused(!paused)} aria-label={paused ? 'Resume animation' : 'Pause animation'} disabled={reduced} title={reduced ? 'Reduced motion is enabled in your system preferences' : 'Pause visual motion; retrieval continues'}>{paused || reduced ? <Play size={14} /> : <Pause size={14} />}<span>{paused || reduced ? 'Motion off' : 'Pause motion'}</span></button>
         {running ? <button className="theater-cancel" onClick={onCancel}><Square size={11} /><span>Cancel</span></button>
-          : onRetry && ['partial', 'cancelled'].includes(run.status) ? <button onClick={onRetry}><RotateCcw size={14} /><span>Retry missing sources</span></button>
+          : onRetry && (run.status === 'cancelled' || run.nodes.some(node => node.status === 'error')) ? <button onClick={onRetry}><RotateCcw size={14} /><span>Retry missing sources</span></button>
             : supported && <button onClick={() => { setPaused(false); setListView(false); setZoom(1); onReplay() }} title="Run the same simulated investigation again, with connector latency"><RotateCcw size={14} /><span>Replay demo</span></button>}
         <button ref={expandButton} onClick={() => setExpanded(!expanded)} aria-label={expanded ? 'Exit expanded canvas' : 'Expand canvas'} aria-pressed={expanded}><Expand size={15} /></button>
       </div>
@@ -224,12 +229,12 @@ export default function InvestigationCanvas({ run, onInspect, onCancel, onRetry,
               {sourceNodes.map((node, index) => {
                 const point = layout.positions[node.id]
                 const source = node.sourceId ? sources[node.sourceId] : undefined
-                const color = colors[source?.platform ?? ''] ?? '#92debf'
+                const color = sourceColor(source?.platform ?? '')
                 const port = sourcePort(point, layout.center)
                 const hub = { x: layout.center.x + (point.x < layout.center.x ? -94 : 94), y: layout.center.y - 20 }
                 const path = connectionPath(port, hub, (index % 3 - 1) * 34)
                 const working = ['retrieving', 'analyzing'].includes(node.status)
-                return <g key={`${run.id}-${node.id}`} className={`connection-group ${node.status}`} style={{ '--source-color': color } as FlightStyle}>
+                return <g key={`${run.id}-${node.id}`} className={`connection-group ${node.status} ${run.turn > 1 && focusIds.has(node.evidenceId ?? '') ? 'focused' : ''}`} style={{ '--source-color': color } as FlightStyle}>
                   <motion.path className="connection-track" initial={still ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} d={path} transition={{ duration: still ? 0 : 0.8 }} />
                   {(working || node.status === 'complete') && <path className={`connection-current ${working ? 'flowing' : ''}`} d={path} />}
                   <circle cx={port.x} cy={port.y} r="3" fill={color} /><circle cx={hub.x} cy={hub.y} r="3" fill={color} />
@@ -247,7 +252,7 @@ export default function InvestigationCanvas({ run, onInspect, onCancel, onRetry,
               {sourceNodes.map((node, index) => {
                 if (!node.sourceId) return null
                 const source = sources[node.sourceId]
-                const color = colors[source.platform] ?? '#92debf'
+                const color = sourceColor(source.platform)
                 const point = layout.positions[node.id]
                 const port = sourcePort(point, layout.center)
                 const hub = { x: layout.center.x + (point.x < layout.center.x ? -94 : 94), y: layout.center.y - 20 }
@@ -262,7 +267,7 @@ export default function InvestigationCanvas({ run, onInspect, onCancel, onRetry,
               })}
             </div>}
             <IntelligenceCore run={run} center={layout.center} onInspect={onInspect} onAnswer={showAnswer} />
-            <AnimatePresence>{sourceNodes.map((node, index) => <FloatingSource key={`${run.id}-${node.id}`} node={node} index={index} position={layout.positions[node.id]} origin={node.dependencies.map(id => layout.positions[id]).find(Boolean) ?? layout.center} run={run} onInspect={onInspect} still={still} />)}</AnimatePresence>
+            <AnimatePresence>{sourceNodes.map((node, index) => <FloatingSource key={`${run.id}-${node.id}`} node={node} index={index} position={layout.positions[node.id]} origin={node.dependencies.map(id => layout.positions[id]).find(Boolean) ?? layout.center} run={run} onInspect={onInspect} still={still} focused={run.turn > 1 && focusIds.has(node.evidenceId ?? '')} />)}</AnimatePresence>
           </div>
         </div>
       </div>
